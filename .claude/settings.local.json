@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(& \"C:\\\\dev\\\\projects\\\\travel-expense\\\\.specify\\\\scripts\\\\powershell\\\\check-prerequisites.ps1\" -Json -PathsOnly)"
+      "PowerShell(& \"C:\\\\dev\\\\projects\\\\travel-expense\\\\.specify\\\\scripts\\\\powershell\\\\check-prerequisites.ps1\" -Json -PathsOnly)",
+      "PowerShell(& \"C:\\\\dev\\\\projects\\\\travel-expense\\\\.specify\\\\scripts\\\\powershell\\\\setup-plan.ps1\" -Json)",
+      "PowerShell(& \"C:\\\\dev\\\\projects\\\\travel-expense\\\\.specify\\\\scripts\\\\powershell\\\\setup-tasks.ps1\" -Json)",
+      "PowerShell(& \"C:\\\\dev\\\\projects\\\\travel-expense\\\\.specify\\\\scripts\\\\powershell\\\\check-prerequisites.ps1\" -Json)",
+      "Bash(npm --version)",
+      "PowerShell(Join-Path *)",
+      "Bash(cp -r C:/Users/hiroj/AppData/Local/Temp/next-scaffold-20261019-054037/travel-expense-app/src C:/dev/projects/travel-expense/src)",
+      "Bash(cp -r C:/Users/hiroj/AppData/Local/Temp/next-scaffold-20261019-054037/travel-expense-app/public C:/dev/projects/travel-expense/public)",
+      "Bash(cp C:/Users/hiroj/AppData/Local/Temp/next-scaffold-20261019-054037/travel-expense-app/package.json C:/dev/projects/travel-expense/package.json)",
+      "Bash(cp C:/Users/hiroj/AppData/Local/Temp/next-scaffold-20261019-054037/travel-expense-app/tsconfig.json C:/dev/projects/travel-expense/tsconfig.json)",
+      "Bash(cp C:/Users/hiroj/AppData/Local/Temp/next-scaffold-20261019-054037/travel-expense-app/next.config.ts C:/dev/projects/travel-expense/next.config.ts)",
+      "PowerShell(Get-Content *)"
     ]
   }
 }

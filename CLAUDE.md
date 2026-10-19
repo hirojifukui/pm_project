@@ -9,3 +9,5 @@
 - 業務ルールの仕様化では、`docs/requirements/` のヒアリングシート（雛形は `.specify/templates/hearing-sheet-template.md`）を一次情報とし、仕様書の `## 業務要件` に出典 ID を付けて反映する。
 - ファイルを書き込んだら読み直し、置換文字（U+FFFD）や mojibake が無いか確認する。見つかったら UTF-8 (BOMなし) で丸ごと書き直す。
 <!-- END speckit-ja: 言語ポリシー -->
+
+@AGENTS.md

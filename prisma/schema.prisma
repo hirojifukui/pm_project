@@ -1,0 +1,226 @@
+// 旅費精算システム Prisma スキーマ
+// 対応仕様: specs/001-travel-expense-reimbursement/data-model.md § 2
+// 備考: SQLite は Prisma の enum をサポートしないため、enum 相当の列は String で
+// 保持し、取り得る値は src/domain/types.ts の Zod スキーマで宣言する。
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/app.sqlite"
+}
+
+model Employee {
+  empNo                String   @id
+  name                 String
+  email                String   @unique
+  department           String
+  rankKind             String   // STAFF | MANAGEMENT
+  role                 String   // APPLICANT | SECTION_MANAGER | DIRECTOR | ACCOUNTANT | ACCOUNTING_DIRECTOR | ACCOUNTING_DIRECTOR_SUPERIOR | SYSTEM_ADMIN
+  sectionManagerEmpNo  String?
+  sectionManager       Employee?  @relation("ReportsTo", fields: [sectionManagerEmpNo], references: [empNo])
+  reports              Employee[] @relation("ReportsTo")
+  status               String   @default("ACTIVE") // ACTIVE | SUSPENDED | RETIRED
+  effectiveFrom        DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  applicationsApplicant      Application[]            @relation("Applicant")
+  applicationsNextApprover   Application[]            @relation("NextApprover")
+  approvalHistories          ApprovalHistory[]
+  proxyAsPrincipal           ProxyApproverAssignment[] @relation("Principal")
+  proxyAsProxy               ProxyApproverAssignment[] @relation("Proxy")
+  proxyCreatedBy             ProxyApproverAssignment[] @relation("ProxyCreatedBy")
+  notifications              Notification[]
+  csvExports                 PaymentCsvExport[]
+  hrImportResults            HrImportResult[]
+  piiAccessLogsAsAccessor    PiiAccessLog[]            @relation("Accessor")
+  piiAccessLogsAsTarget      PiiAccessLog[]            @relation("Target")
+  ruleValueChanges           RuleValue[]
+  holidayAdditions           Holiday[]
+}
+
+model RuleValue {
+  ruleKey        String
+  effectiveFrom  DateTime
+  value          String
+  changedByEmpNo String
+  changedBy      Employee @relation(fields: [changedByEmpNo], references: [empNo])
+  changeReason   String
+  createdAt      DateTime @default(now())
+
+  @@id([ruleKey, effectiveFrom])
+  @@index([ruleKey, effectiveFrom])
+}
+
+model Holiday {
+  date         DateTime @id
+  name         String
+  addedByEmpNo String
+  addedBy      Employee @relation(fields: [addedByEmpNo], references: [empNo])
+}
+
+model Application {
+  applicationNumber         String   @id
+  applicantEmpNo            String
+  applicant                 Employee @relation("Applicant", fields: [applicantEmpNo], references: [empNo])
+  department                String
+  tripStartDate             DateTime
+  tripEndDate               DateTime
+  destination               String
+  purpose                   String
+  totalAmountYen            Int      @default(0)
+  status                    String   @default("DRAFT") // ApplicationStatus
+  submittedAt               DateTime?
+  firstApprovedAt           DateTime?
+  finalApprovedAt           DateTime?
+  accountingFinalizedAt     DateTime?
+  paidAt                    DateTime?
+  withdrawnAt               DateTime?
+  nextApproverEmpNo         String?
+  nextApprover              Employee? @relation("NextApprover", fields: [nextApproverEmpNo], references: [empNo])
+  lateReason                String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  lines                     ExpenseLine[]
+  histories                 ApprovalHistory[]
+  notifications             Notification[]
+  piiAccessLogs             PiiAccessLog[]
+  paymentCsvExportId        String?
+  paymentCsvExport          PaymentCsvExport?  @relation(fields: [paymentCsvExportId], references: [id])
+
+  @@index([applicantEmpNo, status])
+  @@index([nextApproverEmpNo, status])
+  @@index([tripStartDate, tripEndDate, applicantEmpNo])
+}
+
+model ExpenseLine {
+  id                        String   @id
+  applicationNumber         String
+  application               Application @relation(fields: [applicationNumber], references: [applicationNumber], onDelete: Cascade)
+  date                      DateTime
+  category                  String   // ExpenseCategory
+  fromPlace                 String?
+  toPlace                   String?
+  transportMode             String?  // TransportMode
+  amountYen                 Int      @default(0)
+  isSystemGenerated         Boolean  @default(false)
+  taxiReasons               String?  // CSV of TaxiReason, e.g. "AFTER_22,CUSTOMER_RIDE"
+  exceedsLodgingCapReason   String?
+  remarks                   String?
+  createdAt                 DateTime @default(now())
+
+  receipts                  Receipt[]
+
+  @@index([applicationNumber])
+}
+
+model Receipt {
+  id                     String   @id
+  expenseLineId          String
+  expenseLine            ExpenseLine @relation(fields: [expenseLineId], references: [id], onDelete: Cascade)
+  storagePath            String
+  mimeType               String   // image/jpeg | image/png
+  sizeBytes              Int
+  sha256                 String
+  uploadedAt             DateTime @default(now())
+  isSupportingDocument   Boolean  @default(false)
+  supportingReason       String?
+
+  @@index([expenseLineId])
+}
+
+model ApprovalHistory {
+  id                 String   @id
+  applicationNumber  String
+  application        Application @relation(fields: [applicationNumber], references: [applicationNumber], onDelete: Cascade)
+  operatorEmpNo      String
+  operator           Employee @relation(fields: [operatorEmpNo], references: [empNo])
+  actedAs            String   @default("SELF") // SELF | PROXY
+  operation          String   // ApprovalOperation
+  comment            String?
+  occurredAt         DateTime @default(now())
+
+  @@index([applicationNumber, occurredAt])
+}
+
+model ProxyApproverAssignment {
+  id                String   @id
+  principalEmpNo    String
+  principal         Employee @relation("Principal", fields: [principalEmpNo], references: [empNo])
+  proxyEmpNo        String
+  proxy             Employee @relation("Proxy", fields: [proxyEmpNo], references: [empNo])
+  startsAt          DateTime
+  endsAt            DateTime
+  createdByEmpNo    String
+  createdBy         Employee @relation("ProxyCreatedBy", fields: [createdByEmpNo], references: [empNo])
+  createdAt         DateTime @default(now())
+
+  @@index([principalEmpNo, startsAt, endsAt])
+}
+
+model Notification {
+  id                 String   @id
+  recipientEmpNo     String
+  recipient          Employee @relation(fields: [recipientEmpNo], references: [empNo])
+  applicationNumber  String?
+  application        Application? @relation(fields: [applicationNumber], references: [applicationNumber])
+  channel            String   // EMAIL | IN_APP
+  templateId         String
+  operation          String
+  sentAt             DateTime?
+  readAt             DateTime?
+  deliveryStatus     String?  // PENDING | SENT | FAILED
+  failureReason      String?
+  createdAt          DateTime @default(now())
+
+  @@index([recipientEmpNo, readAt])
+}
+
+model PaymentCsvExport {
+  id                          String   @id
+  cutoffDate                  DateTime
+  paymentDate                 DateTime
+  includedApplicationNumbers  String   // JSON array string
+  rowCount                    Int
+  totalAmountYen              Int
+  layoutVersion               String
+  exportedByEmpNo             String
+  exportedBy                  Employee @relation(fields: [exportedByEmpNo], references: [empNo])
+  exportedAt                  DateTime @default(now())
+  fileRelativePath            String
+
+  applications                Application[]
+}
+
+model HrImportResult {
+  id                String   @id
+  importedByEmpNo   String
+  importedBy        Employee @relation(fields: [importedByEmpNo], references: [empNo])
+  sourceFileName    String
+  status            String   // SUCCESS | PARTIAL | FAILED
+  errorKind         String   @default("NONE") // NONE | FILE_MISSING | FORMAT_INVALID | COLUMN_MISSING | ROW_ERRORS
+  rowCount          Int      @default(0)
+  errorRows         String?  // JSON array string
+  startedAt         DateTime
+  finishedAt        DateTime?
+}
+
+model PiiAccessLog {
+  id                 String   @id
+  accessorEmpNo      String
+  accessor           Employee @relation("Accessor", fields: [accessorEmpNo], references: [empNo])
+  applicationNumber  String?
+  application        Application? @relation(fields: [applicationNumber], references: [applicationNumber])
+  targetEmpNo        String?
+  target             Employee? @relation("Target", fields: [targetEmpNo], references: [empNo])
+  reasonCode         String   // APPROVAL | ACCOUNTING | AUDIT | ADMIN_LOOKUP
+  freeNote           String?
+  occurredAt         DateTime @default(now())
+
+  @@index([accessorEmpNo, occurredAt])
+}
